@@ -1,0 +1,208 @@
+---
+title: "rLakeAnalyzer"
+output: html_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+Sys.setenv(TZ='EST')
+require(rLakeAnalyzer)
+```
+
+Data
+----
+
+```{r}
+area = 64e4 #Area of lake in m^2
+wnd.height = 2 #Height of lake anemometer
+```
+
+**load.bathy()** is a convenience function to import lake bathymetry data. Bathymetric data file must be a 2 column array where depth (in meters) and area (in meters^2) information are provided in columns with headers containing the words "depths" and "areas" respectively.
+
+```{r}
+exampleFilePath <- system.file('extdata', 'Sparkling.bth', package="rLakeAnalyzer")
+bathy = load.bathy(exampleFilePath)
+head(bathy)
+```
+
+**load.ts()** is a convenience function to import timeseries data into R based on the standardized format used by Lake Analyzer. Timeseries files must follow a common format. The first column must have the label ’datetime’ and be of the format yyyy-mm-dd HH:MM:SS (ISO 8601 without the "T" delimiter). The seconds can be skipped if not using sub-minute data. Make sure you define the timezone. Function defaults to GMT. The system environment needs to match and can be set **Sys.setenv(TZ='EST')**.
+
+```{r}
+temp.path <- system.file('extdata', 'Sparkling.wtr', package="rLakeAnalyzer")
+wind.path <- system.file('extdata', 'Sparkling.daily.wnd', package="rLakeAnalyzer")
+
+temp = load.ts(temp.path, tz = "EST")
+wind = load.ts(wind.path, tz = "EST")
+head(temp[,1:5])
+head(wind)
+```
+
+Create single profile from timeseries data to test base functions.
+
+```{r}
+temp.1 = as.numeric(temp[temp$datetime == "2009-08-01 10:00:00",-1])
+wind.1 = as.numeric(wind[wind$datetime == "2009-08-01 10:00:00",-1])
+```
+
+Base Functions
+--------------
+
+Get depths from data frame containing temperature profile info. **get.offsets()** extracts the depth information from a data frame containing multi-depth observation data. Relies on the format of the header to get information and may fail if your file format is incorrect.
+
+```{r}
+depths = get.offsets(temp)
+depths
+```
+
+Calculate depth of the thermocline from a temperature profile. **thermo.depth** calculates the location of the thermocline from a temperature profile. It uses a special technique to estimate where the thermocline lies even between two temperature measurement depths, giving a potentially finer-scale estimate than usual techniques. Includes an argument *seasonal* - a logical value indicating whether the seasonal thermocline should be returned. The seasonal thermocline is defined as the deepest density gradient found in the profile. If FALSE, the depth of the maximum density gradient is returned.
+
+```{r}
+t.d = thermo.depth(temp.1, depths)
+cat('Thermocline depth is:', t.d)
+```
+
+Calculate the Top and Bottom Depths of the Metalimnion. **meta.depths()** calculates the top and bottom depths of the metalimnion in a stratified lake. The metalimnion is defined as the water stratum in a stratified lake with the steepest thermal gradient and is demarcated by the bottom of the epilimnion and top of the hypolimnion.
+
+```{r}
+m.d = meta.depths(temp.1, depths)
+cat('The top depth of the metalimnion is:', m.d[1])
+cat('The bottom depth of the metalimnion is:', m.d[2])
+```
+
+**layer.temperature()** returns the average temperature of a layer between two depths.
+
+```{r}
+meta.temp = layer.temperature(m.d[1],m.d[2],temp.1,
+                  depths,bathy$areas,bathy$depths)
+cat('The average temperature of the metalimnion is:', meta.temp)
+```
+
+**water.density()** determines the density of water from temperature. Returns a numeric vector of water densities in kg/m^3. **layer.density()** returns the average density of a layer between two depths.
+
+```{r}
+dens = water.density(temp.1)
+plot(temp.1, dens, xlab="Temp(deg C)", ylab="Density(kg/m^3)")
+epi.dens = layer.density(0,m.d[1],temp.1,
+                  depths,bathy$areas,bathy$depths)
+hypo.dens = layer.density(m.d[2],max(depths),temp.1,
+                  depths,bathy$areas,bathy$depths)
+```
+
+Schmidt stability is the resistance to mechanical mixing due to the potential energy inherent in the stratification of the water column. Schmidt stability was first defined by Schmidt (1928) and later modified by Hutchinson (1957). This stability index was formalized by Idso (1973) to reduce the effects of lake volume on the calculation (resulting in a mixing energy requirement per unit area). **schmidt.stability()** returns a numeric vector of Schmidt stability (J/m^2).
+
+```{r}
+SS = schmidt.stability(temp.1, depths, bathy$areas,bathy$depths)
+SS
+```
+
+**uStar()** calculates the water friction velocity. uStar is the water friction velocity due to wind stress at the lake surface, it is calculated following the methods of Imberger (1985) as a function of the shear stress of air (Fischer et al., 1979), drag coefficient for momentum (Hicks, 1972), and a dimensionless constant (von Karman constant) that describes the logarithmic velocity profile at the air-water interface.
+
+```{r}
+uS = uStar(wind.1,wnd.height,epi.dens)
+uS
+```
+
+The Lake Number, defined by Imberger and Patterson (1990), has been used to describe processes relevant to the internal mixing of lakes induced by wind forcings. Lower values of Lake Number represent a higher potential for increased diapycnal mixing, which increases the vertical flux of mass and energy across the metalimnion through the action of non-linear internal waves. Lake Number is a dimensionless index. **lake.number()** returns a numeric vector of Lake Number [dimensionless].
+
+```{r}
+LN = lake.number(bathy$areas, bathy$depths, uS, SS, m.d[1], m.d[2], hypo.dens)
+LN
+```
+
+**wedderburn.number()** calculates the Wedderburn Number for a lake. Wedderburn Number (Wn) is a dimensionless parameter measuring the balance between wind stress and buoyancy force and is used to estimate the amount of upwelling occurring in a lake. When Wn is much greater than 1, the buoyancy force is much greater than the wind stress and therefore there is a strong vertical stratification with little horizontal variation in the stratification. When Wn is much less than 1, the wind stress is much greater than the buoyancy force and upwelling is likely occurring at the upwind end of the lake. When Wn is near 1, the bouyance force and wind stress are nearly equal and horizontal mixing is considered important.
+
+```{r}
+WN = wedderburn.number(hypo.dens - epi.dens, m.d[1], 
+                           uS, area, hypo.dens)
+WN
+```
+
+Timeseries Functions
+--------------------
+
+Functions for simplifying the calculation of physical indices for a timeseries of observation data.
+
+```{r}
+ts.TD = ts.thermo.depth(temp)
+ts.MD = ts.meta.depths(temp)
+
+plot(ts.TD$datetime, -ts.TD$thermo.depth, type='l', ylab='Depth (m)', xlab='Date')
+lines(ts.MD$datetime, -ts.MD$top, col='red')
+lines(ts.MD$datetime, -ts.MD$bottom, col='red')
+
+ts.SS = ts.schmidt.stability(temp, bathy)
+ts.uS = ts.uStar(temp, wind, wnd.height, bathy)
+ts.LN = ts.lake.number(temp, wind, wnd.height, bathy)
+plot(ts.LN$datetime, ts.LN$lake.number, type='l', ylab='Lake Number', xlab='Date')
+```
+
+Calculate volume-weighted average water temperature across a range of depths for a timeseries. Returns a data frame with the timeseries of the average layer temperature. Includes ‘datetime’ and ‘layer.temp’ columns.
+
+```{r}
+meta.temp = ts.layer.temperature(temp, ts.MD$top, ts.MD$bottom, bathy)
+plot(meta.temp$datetime, meta.temp$layer.temp, type='l',
+ylab='Volumetrically averaged lake temperature', xlab='Date')
+```
+
+Calculate the buoyancy (Brunt-Vaisala) frequency for a time series of temperature
+profiles. Returns a data frame with the timeseries of buoyancy frequency. Includes a ‘datetime’ column. **ts.buoyancy.freq()** is called and applied across the given temperature profiles. **buoyancy.freq()** can be called on its own to calculate the buoyancy frequency for a single temperature profile.
+
+```{r}
+# buoyancy.freq
+buoyancy.freq(as.numeric(temp[1,-1]), depths)
+
+# ts.buoyancy.freq
+N2 = ts.buoyancy.freq(temp, seasonal=FALSE)
+SN2 = ts.buoyancy.freq(temp, seasonal=TRUE)
+
+plot(N2, type='l', ylab='Buoyancy Frequency', xlab='Date')
+lines(SN2, col='red')
+```
+
+Function for simplifying the calculation of Wedderburn Number. Can usually be called directly on data loaded directly using load.ts() and load.bathy(). Returns a data frame with the timeseries of Wedderburn number. Includes a ‘datetime’ column.
+
+```{r}
+ts.WN = ts.wedderburn.number(temp, wind, wnd.height, bathy, area)
+plot(ts.WN$datetime, ts.WN$wedderburn.number, type='l', 
+     ylab='Wedderburn Number', xlab='Date')
+```
+
+Plots
+-----
+
+**schmidt.plot()** creates a time series plot of Schmidt’s stability. Generates a time series of Schmidt’s stability where each value represents water column stability
+for each time step of data.
+
+```{r}
+schmidt.plot(temp,bathy)
+```
+
+**lake.number.plot()** plots time series of Lake Number. Generates a time series plot of Lake Number for appropriately formatted data.
+
+```{r}
+lake.number.plot(temp,wind,wnd.height,bathy)
+```
+
+**wtr.plot.temp()** creates a time series plot of the thermocline and top and bottom of
+the metalimnion. A line based plot from a temperature profile time series.
+
+```{r}
+wtr.plot.temp(temp)
+```
+
+**wtr.heat.map()** creates a simple, default heatmap of water temperature. Additional parameters can be supplied to filled.contour to modify defaults.
+
+```{r}
+wtr.heat.map(temp)
+```
+
+**wtr.heatmap.layers()** creates a heat map of water temperature similar to wtr.heat.map with additional lines drawn to denote the thermocline, and the top and bottom of the metalimnion as calculated using ts.meta.depths and thermo.depth.
+
+```{r}
+wtr.heatmap.layers(temp)
+```
+
+**wtr.lineseries()** creates a line based plot of temperature profile time series. A non-heat map approach to visualizing a water temperature profile useful for identify temperature trends over time at discrete depths and diagnosing issues with data.
+
+```{r}
+wtr.lineseries(temp, ylab = "Temperature C")
+```

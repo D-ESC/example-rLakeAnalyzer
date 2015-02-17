@@ -1,2 +1,2 @@
-# vignette-rLakeAnalyzer
-rLakeAnalyzer walk through from the presentation given at DESC on 2015-02-13. Material is from the rLakeAnalyzer reference manual found [here](http://cran.r-project.org/web/packages/rLakeAnalyzer/rLakeAnalyzer.pdf).
+# example-rLakeAnalyzer
+rLakeAnalyzer walk through from the presentation given at DESC on 2015-02-13. Material is from the rLakeAnalyzer reference manual found [here](http://cran.r-project.org/web/packages/rLakeAnalyzer/rLakeAnalyzer.pdf). To be able to work with any of the code examples your files should conform to the formats outlined [here](http://cran.r-project.org/web/packages/rLakeAnalyzer/vignettes/data.handling.pdf).

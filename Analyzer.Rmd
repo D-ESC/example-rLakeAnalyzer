@@ -12,35 +12,42 @@ Data
 ----
 
 ```{r}
-area = 64e4 #Area of lake in m^2
+area = 713800 #Area of lake in m^2
 wnd.height = 2 #Height of lake anemometer
 ```
 
 **load.bathy()** is a convenience function to import lake bathymetry data. Bathymetric data file must be a 2 column array where depth (in meters) and area (in meters^2) information are provided in columns with headers containing the words "depths" and "areas" respectively.
 
 ```{r}
-exampleFilePath <- system.file('extdata', 'Sparkling.bth', package="rLakeAnalyzer")
-bathy = load.bathy(exampleFilePath)
+bathy = load.bathy("hp_bth.txt")
 head(bathy)
 ```
 
 **load.ts()** is a convenience function to import timeseries data into R based on the standardized format used by Lake Analyzer. Timeseries files must follow a common format. The first column must have the label ’datetime’ and be of the format yyyy-mm-dd HH:MM:SS (ISO 8601 without the "T" delimiter). The seconds can be skipped if not using sub-minute data. Make sure you define the timezone. Function defaults to GMT. The system environment needs to match and can be set **Sys.setenv(TZ='EST')**.
 
 ```{r}
-temp.path <- system.file('extdata', 'Sparkling.wtr', package="rLakeAnalyzer")
-wind.path <- system.file('extdata', 'Sparkling.daily.wnd', package="rLakeAnalyzer")
-
-temp = load.ts(temp.path, tz = "EST")
-wind = load.ts(wind.path, tz = "EST")
+temp = load.ts("hp_wtr.txt", tz = "EST")
+wind = load.ts("hp_wnd.txt", tz = "EST")
 head(temp[,1:5])
 head(wind)
 ```
 
+It may make more sense to work with daily aggregate values.
+
+```{r}
+temp.dly = aggregate(temp[,-1],by=list(as.Date(temp[,1])),FUN=mean)
+names(temp.dly) = names(temp)
+
+wind.dly = aggregate(wind[,-1],by=list(as.Date(wind[,1])),FUN=mean)
+names(wind.dly) = names(wind)
+```
+
+
 Create single profile from timeseries data to test base functions.
 
 ```{r}
-temp.1 = as.numeric(temp[temp$datetime == "2009-08-01 10:00:00",-1])
-wind.1 = as.numeric(wind[wind$datetime == "2009-08-01 10:00:00",-1])
+temp.1 = as.numeric(temp[temp$datetime == "2013-08-01 10:00:00",-1])
+wind.1 = as.numeric(wind[wind$datetime == "2013-08-01 10:00:00",-1])
 ```
 
 Base Functions

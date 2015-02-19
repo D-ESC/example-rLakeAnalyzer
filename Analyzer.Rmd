@@ -42,12 +42,11 @@ wind.dly = aggregate(wind[,-1],by=list(as.Date(wind[,1])),FUN=mean)
 names(wind.dly) = names(wind)
 ```
 
-
 Create single profile from timeseries data to test base functions.
 
 ```{r}
-temp.1 = as.numeric(temp[temp$datetime == "2013-08-01 10:00:00",-1])
-wind.1 = as.numeric(wind[wind$datetime == "2013-08-01 10:00:00",-1])
+temp.1 = as.numeric(temp.dly[temp.dly$datetime == "2013-08-01",-1])
+wind.1 = as.numeric(wind.dly[wind.dly$datetime == "2013-08-01",-1])
 ```
 
 Base Functions
@@ -56,7 +55,7 @@ Base Functions
 Get depths from data frame containing temperature profile info. **get.offsets()** extracts the depth information from a data frame containing multi-depth observation data. Relies on the format of the header to get information and may fail if your file format is incorrect.
 
 ```{r}
-depths = get.offsets(temp)
+depths = get.offsets(temp.dly)
 depths
 ```
 
@@ -129,23 +128,23 @@ Timeseries Functions
 Functions for simplifying the calculation of physical indices for a timeseries of observation data.
 
 ```{r}
-ts.TD = ts.thermo.depth(temp)
-ts.MD = ts.meta.depths(temp)
+ts.TD = ts.thermo.depth(temp.dly)
+ts.MD = ts.meta.depths(temp.dly)
 
 plot(ts.TD$datetime, -ts.TD$thermo.depth, type='l', ylab='Depth (m)', xlab='Date')
 lines(ts.MD$datetime, -ts.MD$top, col='red')
 lines(ts.MD$datetime, -ts.MD$bottom, col='red')
 
-ts.SS = ts.schmidt.stability(temp, bathy)
-ts.uS = ts.uStar(temp, wind, wnd.height, bathy)
-ts.LN = ts.lake.number(temp, wind, wnd.height, bathy)
+ts.SS = ts.schmidt.stability(temp.dly, bathy)
+ts.uS = ts.uStar(temp.dly, wind.dly, wnd.height, bathy)
+ts.LN = ts.lake.number(temp.dly, wind.dly, wnd.height, bathy)
 plot(ts.LN$datetime, ts.LN$lake.number, type='l', ylab='Lake Number', xlab='Date')
 ```
 
 Calculate volume-weighted average water temperature across a range of depths for a timeseries. Returns a data frame with the timeseries of the average layer temperature. Includes ‘datetime’ and ‘layer.temp’ columns.
 
 ```{r}
-meta.temp = ts.layer.temperature(temp, ts.MD$top, ts.MD$bottom, bathy)
+meta.temp = ts.layer.temperature(temp.dly, ts.MD$top, ts.MD$bottom, bathy)
 plot(meta.temp$datetime, meta.temp$layer.temp, type='l',
 ylab='Volumetrically averaged lake temperature', xlab='Date')
 ```
@@ -155,11 +154,11 @@ profiles. Returns a data frame with the timeseries of buoyancy frequency. Includ
 
 ```{r}
 # buoyancy.freq
-buoyancy.freq(as.numeric(temp[1,-1]), depths)
+buoyancy.freq(as.numeric(temp.dly[1,-1]), depths)
 
 # ts.buoyancy.freq
-N2 = ts.buoyancy.freq(temp, seasonal=FALSE)
-SN2 = ts.buoyancy.freq(temp, seasonal=TRUE)
+N2 = ts.buoyancy.freq(temp.dly, seasonal=FALSE)
+SN2 = ts.buoyancy.freq(temp.dly, seasonal=TRUE)
 
 plot(N2, type='l', ylab='Buoyancy Frequency', xlab='Date')
 lines(SN2, col='red')
@@ -168,7 +167,7 @@ lines(SN2, col='red')
 Function for simplifying the calculation of Wedderburn Number. Can usually be called directly on data loaded directly using load.ts() and load.bathy(). Returns a data frame with the timeseries of Wedderburn number. Includes a ‘datetime’ column.
 
 ```{r}
-ts.WN = ts.wedderburn.number(temp, wind, wnd.height, bathy, area)
+ts.WN = ts.wedderburn.number(temp.dly, wind.dly, wnd.height, bathy, area)
 plot(ts.WN$datetime, ts.WN$wedderburn.number, type='l', 
      ylab='Wedderburn Number', xlab='Date')
 ```
@@ -180,36 +179,36 @@ Plots
 for each time step of data.
 
 ```{r}
-schmidt.plot(temp,bathy)
+schmidt.plot(temp.dly,bathy)
 ```
 
 **lake.number.plot()** plots time series of Lake Number. Generates a time series plot of Lake Number for appropriately formatted data.
 
 ```{r}
-lake.number.plot(temp,wind,wnd.height,bathy)
+lake.number.plot(temp.dly,wind.dly,wnd.height,bathy)
 ```
 
 **wtr.plot.temp()** creates a time series plot of the thermocline and top and bottom of
 the metalimnion. A line based plot from a temperature profile time series.
 
 ```{r}
-wtr.plot.temp(temp)
+wtr.plot.temp(temp.dly)
 ```
 
 **wtr.heat.map()** creates a simple, default heatmap of water temperature. Additional parameters can be supplied to filled.contour to modify defaults.
 
 ```{r}
-wtr.heat.map(temp)
+wtr.heat.map(temp.dly)
 ```
 
 **wtr.heatmap.layers()** creates a heat map of water temperature similar to wtr.heat.map with additional lines drawn to denote the thermocline, and the top and bottom of the metalimnion as calculated using ts.meta.depths and thermo.depth.
 
 ```{r}
-wtr.heatmap.layers(temp)
+wtr.heatmap.layers(temp.dly)
 ```
 
 **wtr.lineseries()** creates a line based plot of temperature profile time series. A non-heat map approach to visualizing a water temperature profile useful for identify temperature trends over time at discrete depths and diagnosing issues with data.
 
 ```{r}
-wtr.lineseries(temp, ylab = "Temperature C")
+wtr.lineseries(temp.dly, ylab = "Temperature C")
 ```
